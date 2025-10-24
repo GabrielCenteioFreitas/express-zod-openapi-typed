@@ -1,6 +1,7 @@
-import { Router, Request, Response, NextFunction, RequestHandler } from 'express';
+import { Router, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import { z, ZodSchema, ZodType } from 'zod';
 import { getGlobalErrorHandler, defaultErrorHandler } from './config';
+import { RequestValidationError, ResponseValidationError } from './errors';
 
 export interface RouteSchema {
   body?: ZodType<any>;
@@ -19,6 +20,11 @@ export interface RouteSchema {
     description?: string;
     url: string;
   };
+}
+
+export interface RouteOptions<T extends RouteSchema> {
+  schema: T & RouteSchema;
+  errorHandler?: ErrorRequestHandler;
 }
 
 type InferSchemaTypes<T extends RouteSchema> = {
@@ -66,16 +72,24 @@ interface RouteMetadata {
 const routesMetadata: RouteMetadata[] = [];
 
 const createValidationMiddleware = <T extends RouteSchema>(
-  schema: T
+  schema: T,
+  routeErrorHandler?: ErrorRequestHandler
 ): RequestHandler => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const errorHandler = getGlobalErrorHandler() || defaultErrorHandler;
+      const globalErrorHandler = getGlobalErrorHandler();
 
       if (schema.body) {
         const bodyResult = await schema.body.safeParseAsync(req.body);
         if (!bodyResult.success) {
-          return errorHandler(bodyResult.error, req, res, 'body');
+          const error = new RequestValidationError('body', bodyResult.error, req);
+          if (routeErrorHandler) {
+            return routeErrorHandler(error, req, res, next);
+          }
+          if (globalErrorHandler) {
+            return globalErrorHandler(error, req, res, next);
+          }
+          return next(error);
         }
         req.body = bodyResult.data;
       }
@@ -83,7 +97,14 @@ const createValidationMiddleware = <T extends RouteSchema>(
       if (schema.querystring) {
         const queryResult = await schema.querystring.safeParseAsync(req.query);
         if (!queryResult.success) {
-          return errorHandler(queryResult.error, req, res, 'querystring');
+          const error = new RequestValidationError('querystring', queryResult.error, req);
+          if (routeErrorHandler) {
+            return routeErrorHandler(error, req, res, next);
+          }
+          if (globalErrorHandler) {
+            return globalErrorHandler(error, req, res, next);
+          }
+          return next(error);
         }
         req.query = queryResult.data;
       }
@@ -91,7 +112,14 @@ const createValidationMiddleware = <T extends RouteSchema>(
       if (schema.params) {
         const paramsResult = await schema.params.safeParseAsync(req.params);
         if (!paramsResult.success) {
-          return errorHandler(paramsResult.error, req, res, 'params');
+          const error = new RequestValidationError('params', paramsResult.error, req);
+          if (routeErrorHandler) {
+            return routeErrorHandler(error, req, res, next);
+          }
+          if (globalErrorHandler) {
+            return globalErrorHandler(error, req, res, next);
+          }
+          return next(error);
         }
         req.params = paramsResult.data;
       }
@@ -99,7 +127,14 @@ const createValidationMiddleware = <T extends RouteSchema>(
       if (schema.headers) {
         const headersResult = await schema.headers.safeParseAsync(req.headers);
         if (!headersResult.success) {
-          return errorHandler(headersResult.error, req, res, 'headers');
+          const error = new RequestValidationError('headers', headersResult.error, req);
+          if (routeErrorHandler) {
+            return routeErrorHandler(error, req, res, next);
+          }
+          if (globalErrorHandler) {
+            return globalErrorHandler(error, req, res, next);
+          }
+          return next(error);
         }
         Object.assign(req.headers, headersResult.data);
       }
@@ -121,7 +156,16 @@ const createValidationMiddleware = <T extends RouteSchema>(
             const result = responseSchema.safeParse(body);
             if (!result.success) {
               console.error(`Response validation failed for status ${currentStatusCode}:`, result.error.flatten());
-              errorHandler(result.error, req, res, 'response');
+              const error = new ResponseValidationError(currentStatusCode, result.error, req, res, body);
+              if (routeErrorHandler) {
+                routeErrorHandler(error, req, res, next);
+                return res;
+              }
+              if (globalErrorHandler) {
+                globalErrorHandler(error, req, res, next);
+                return res;
+              }
+              next(error);
               return res;
             }
           }
@@ -143,59 +187,60 @@ export const CreateTypedRouter = () => {
     method: 'get' | 'post' | 'put' | 'delete' | 'patch',
     path: string,
     schema: T,
-    handler: TypedRequestHandler<T>
+    handler: TypedRequestHandler<T>,
+    errorHandler?: ErrorRequestHandler
   ) => {
     if (!schema.hide) {
       routesMetadata.push({ method: method.toUpperCase(), path, schema });
     }
 
-    const validationMiddleware = createValidationMiddleware(schema);
+    const validationMiddleware = createValidationMiddleware(schema, errorHandler);
     expressRouter[method](path, validationMiddleware, handler as any);
   };
 
   const typedRouter = {
     get<T extends RouteSchema = RouteSchema>(
       path: string,
-      options: { schema: T & RouteSchema },
+      options: RouteOptions<T>,
       handler: TypedRequestHandler<T>
     ) {
-      registerRoute('get', path, options.schema, handler);
+      registerRoute('get', path, options.schema, handler, options.errorHandler);
       return this;
     },
 
     post<T extends RouteSchema = RouteSchema>(
       path: string,
-      options: { schema: T & RouteSchema },
+      options: RouteOptions<T>,
       handler: TypedRequestHandler<T>
     ) {
-      registerRoute('post', path, options.schema, handler);
+      registerRoute('post', path, options.schema, handler, options.errorHandler);
       return this;
     },
 
     put<T extends RouteSchema = RouteSchema>(
       path: string,
-      options: { schema: T & RouteSchema },
+      options: RouteOptions<T>,
       handler: TypedRequestHandler<T>
     ) {
-      registerRoute('put', path, options.schema, handler);
+      registerRoute('put', path, options.schema, handler, options.errorHandler);
       return this;
     },
 
     delete<T extends RouteSchema = RouteSchema>(
       path: string,
-      options: { schema: T & RouteSchema },
+      options: RouteOptions<T>,
       handler: TypedRequestHandler<T>
     ) {
-      registerRoute('delete', path, options.schema, handler);
+      registerRoute('delete', path, options.schema, handler, options.errorHandler);
       return this;
     },
 
     patch<T extends RouteSchema = RouteSchema>(
       path: string,
-      options: { schema: T & RouteSchema },
+      options: RouteOptions<T>,
       handler: TypedRequestHandler<T>
     ) {
-      registerRoute('patch', path, options.schema, handler);
+      registerRoute('patch', path, options.schema, handler, options.errorHandler);
       return this;
     },
 
