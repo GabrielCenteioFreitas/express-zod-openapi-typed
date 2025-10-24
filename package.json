@@ -1,0 +1,43 @@
+{
+  "name": "express-zod-openapi",
+  "version": "1.0.0",
+  "description": "Type-safe Express routes with Zod validation and automatic OpenAPI spec generation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "express",
+    "zod",
+    "openapi",
+    "swagger",
+    "typescript",
+    "validation",
+    "type-safe",
+    "rest-api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0",
+    "zod": "^3.0.0 || ^4.0.0"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.4",
+    "@types/node": "^24.9.1",
+    "express": "^5.1.0",
+    "typescript": "^5.9.3",
+    "zod": "^4.1.12"
+  }
+}
