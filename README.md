@@ -313,18 +313,68 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec));
 
 ### 🛡️ Custom Error Handler
 
-```typescript
-import { setGlobalErrorHandler } from 'express-zod-openapi-typed';
+**Global Error Handler:**
 
-setGlobalErrorHandler((error, req, res, type) => {
-  console.error(`Validation error in ${type}:`, error);
-  
-  return res.status(type === 'response' ? 500 : 400).json({
-    success: false,
-    message: `Invalid ${type}`,
-    errors: error.flatten().fieldErrors,
-  });
+```typescript
+import { 
+  setGlobalErrorHandler,
+  RequestValidationError, 
+  ResponseValidationError 
+} from 'express-zod-openapi-typed';
+
+setGlobalErrorHandler((err, req, res, next) => {
+  if (err instanceof RequestValidationError) {
+    return res.status(422).json({
+      success: false,
+      message: `Invalid ${err.segment}`,
+      errors: err.fieldErrors,
+    });
+  }
+
+  if (err instanceof ResponseValidationError) {
+    console.error('Response validation failed:', err);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+    });
+  }
 });
+```
+
+**Per-Route Error Handler:**
+
+```typescript
+import { 
+  RequestValidationError, 
+  ResponseValidationError 
+} from 'express-zod-openapi-typed';
+
+router.post('/users', {
+  schema: {
+    body: z.object({ name: z.string() }),
+  },
+  errorHandler: (err, req, res, next) => {
+    if (err instanceof RequestValidationError) {
+      return res.status(422).json({
+        success: false,
+        message: `Invalid ${err.segment}`,
+        errors: err.fieldErrors,
+      });
+    }
+
+    if (err instanceof ResponseValidationError) {
+      console.error('Response validation failed:', err);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+      });
+    }
+    
+    next(err);
+  },
+}, handler);
 ```
 
 ## 📄 License

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
+import { RequestValidationError, ResponseValidationError } from './errors';
 
 export interface ValidationErrorResponse {
   message: string;
@@ -8,10 +8,10 @@ export interface ValidationErrorResponse {
 }
 
 export type ErrorHandler = (
-  error: ZodError,
+  error: RequestValidationError | ResponseValidationError,
   req: Request,
   res: Response,
-  type: 'body' | 'querystring' | 'params' | 'headers' | 'response'
+  next: NextFunction
 ) => void | Response;
 
 export interface OpenAPIGlobalConfig {
@@ -48,20 +48,27 @@ export const getOpenAPIDefaults = (): OpenAPIGlobalConfig | undefined => {
   return config.openApiDefaults;
 };
 
-export const defaultErrorHandler: ErrorHandler = (error, req, res, type) => {
-  const errorMessages: Record<typeof type, string> = {
-    body: 'Body validation failed.',
-    querystring: 'Query string validation failed.',
-    params: 'Params validation failed.',
-    headers: 'Headers validation failed.',
-    response: 'Internal error: server response does not match expected schema.',
-  };
+export const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
+  if (error instanceof RequestValidationError) {
+    const errorMessages: Record<typeof error.segment, string> = {
+      body: 'Body validation failed.',
+      querystring: 'Query string validation failed.',
+      params: 'Params validation failed.',
+      headers: 'Headers validation failed.',
+    };
 
-  const statusCode = type === 'response' ? 500 : 400;
+    return res.status(400).json({
+      message: errorMessages[error.segment],
+      status: 'error',
+      errors: error.fieldErrors,
+    });
+  }
 
-  return res.status(statusCode).json({
-    message: errorMessages[type],
-    status: 'error',
-    errors: error.flatten().fieldErrors,
-  });
+  if (error instanceof ResponseValidationError) {
+    return res.status(500).json({
+      message: 'Internal error: server response does not match expected schema.',
+      status: 'error',
+      errors: error.fieldErrors,
+    });
+  }
 };

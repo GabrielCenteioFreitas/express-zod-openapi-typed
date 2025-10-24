@@ -14,3 +14,6 @@ export type {
   ValidationErrorResponse, 
   OpenAPIGlobalConfig 
 } from './config';
+
+export { RequestValidationError, ResponseValidationError } from './errors';
+export type { ValidationSegment } from './errors';
