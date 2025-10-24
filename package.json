@@ -1,7 +1,13 @@
 {
-  "name": "express-zod-openapi",
+  "name": "express-zod-openapi-typed",
   "version": "1.0.0",
+  "author": "Gabriel Centeio Freitas <gabrielcenteio.freitas@gmail.com>",
+  "license": "MIT",
   "description": "Type-safe Express routes with Zod validation and automatic OpenAPI spec generation",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GabrielCenteioFreitas/express-zod-openapi-typed"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -24,8 +30,6 @@
     "type-safe",
     "rest-api"
   ],
-  "author": "",
-  "license": "MIT",
   "peerDependencies": {
     "express": "^4.0.0 || ^5.0.0",
     "zod": "^3.0.0 || ^4.0.0"

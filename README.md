@@ -1,4 +1,4 @@
-# express-zod-openapi
+# express-zod-openapi-typed
 
 Type-safe Express routes with Zod validation and automatic OpenAPI specification generation.
 
@@ -14,7 +14,7 @@ Type-safe Express routes with Zod validation and automatic OpenAPI specification
 ## 📦 Installation
 
 ```bash
-npm install express-zod-openapi express zod
+npm install express-zod-openapi-typed express zod
 ```
 
 ```bash
@@ -26,7 +26,7 @@ npm install -D @types/express
 ```typescript
 import express from 'express';
 import { z } from 'zod';
-import { CreateTypedRouter, generateOpenAPISpec } from 'express-zod-openapi';
+import { CreateTypedRouter, generateOpenAPISpec } from 'express-zod-openapi-typed';
 
 const app = express();
 app.use(express.json());
@@ -87,7 +87,7 @@ Optional helper function to create route schemas with proper typing. You can als
 
 ```typescript
 // Using createSchema helper (optional)
-import { createSchema } from 'express-zod-openapi';
+import { createSchema } from 'express-zod-openapi-typed';
 
 const schema = createSchema({
   params: z.object({ id: z.string() }),
@@ -159,7 +159,7 @@ const spec = generateOpenAPISpec({
 Customize how validation errors are handled globally.
 
 ```typescript
-import { setGlobalErrorHandler } from 'express-zod-openapi';
+import { setGlobalErrorHandler } from 'express-zod-openapi-typed';
 
 setGlobalErrorHandler((error, req, res, type) => {
   return res.status(400).json({
@@ -175,7 +175,7 @@ setGlobalErrorHandler((error, req, res, type) => {
 Set global defaults for OpenAPI generation.
 
 ```typescript
-import { setOpenAPIDefaults } from 'express-zod-openapi';
+import { setOpenAPIDefaults } from 'express-zod-openapi-typed';
 
 setOpenAPIDefaults({
   servers: [
@@ -215,7 +215,7 @@ import type {
   OpenAPIConfig,
   OpenAPIGlobalConfig,
   ValidationErrorResponse
-} from 'express-zod-openapi';
+} from 'express-zod-openapi-typed';
 ```
 
 ## 💡 Examples
@@ -225,7 +225,7 @@ import type {
 ```typescript
 import express from 'express';
 import { z } from 'zod';
-import { CreateTypedRouter, generateOpenAPISpec } from 'express-zod-openapi';
+import { CreateTypedRouter, generateOpenAPISpec } from 'express-zod-openapi-typed';
 
 const app = express();
 app.use(express.json());
@@ -314,7 +314,7 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec));
 ### 🛡️ Custom Error Handler
 
 ```typescript
-import { setGlobalErrorHandler } from 'express-zod-openapi';
+import { setGlobalErrorHandler } from 'express-zod-openapi-typed';
 
 setGlobalErrorHandler((error, req, res, type) => {
   console.error(`Validation error in ${type}:`, error);
