@@ -3,12 +3,19 @@ import { z, ZodSchema, ZodType } from 'zod';
 import { getGlobalErrorHandler, defaultErrorHandler } from './config';
 import { RequestValidationError, ResponseValidationError } from './errors';
 
+export type FileFieldConfig = {
+  maxCount?: number;
+  required?: boolean;
+  description?: string;
+};
+
 export interface RouteSchema {
   body?: ZodType<any>;
   querystring?: ZodType<any>;
   params?: ZodType<any>;
   headers?: ZodType<any>;
   response?: Record<number, ZodType<any>>;
+  files?: Record<string, FileFieldConfig>;
   summary?: string;
   description?: string;
   tags?: string[];
@@ -61,7 +68,7 @@ export type TypedRequest<T extends RouteSchema> = Request<
 type TypedRequestHandler<T extends RouteSchema> = (
   req: TypedRequest<T>,
   res: TypedResponse<T>
-) => void | Promise<void>;
+) => void | Promise<void> | Response | Promise<Response> | Promise<Response | undefined>;
 
 interface RouteMetadata {
   method: string;
@@ -78,6 +85,46 @@ const createValidationMiddleware = <T extends RouteSchema>(
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const globalErrorHandler = getGlobalErrorHandler();
+
+      if (schema.files) {
+        const files = (req as any).files || {};
+        const file = (req as any).file;
+        
+        const missingFiles: string[] = [];
+        
+        Object.entries(schema.files).forEach(([fieldName, config]) => {
+          const hasFile = file?.fieldname === fieldName || files[fieldName];
+          
+          if (config.required && !hasFile) {
+            missingFiles.push(fieldName);
+          }
+          
+          if (config.maxCount && files[fieldName]) {
+            const fileArray = Array.isArray(files[fieldName]) ? files[fieldName] : [files[fieldName]];
+            if (fileArray.length > config.maxCount) {
+              missingFiles.push(`${fieldName} (max ${config.maxCount} files)`);
+            }
+          }
+        });
+
+        if (missingFiles.length > 0) {
+          const zodError = new z.ZodError([
+            {
+              code: 'custom',
+              message: `Missing required files: ${missingFiles.join(', ')}`,
+              path: ['files'],
+            },
+          ]);
+          const error = new RequestValidationError('body', zodError, req);
+          if (routeErrorHandler) {
+            return routeErrorHandler(error, req, res, next);
+          }
+          if (globalErrorHandler) {
+            return globalErrorHandler(error, req, res, next);
+          }
+          return next(error);
+        }
+      }
 
       if (schema.body) {
         const bodyResult = await schema.body.safeParseAsync(req.body);
@@ -188,59 +235,53 @@ export const CreateTypedRouter = () => {
     path: string,
     schema: T,
     handler: TypedRequestHandler<T>,
-    errorHandler?: ErrorRequestHandler
+    errorHandler?: ErrorRequestHandler,
+    middlewares?: RequestHandler[]
   ) => {
     if (!schema.hide) {
       routesMetadata.push({ method: method.toUpperCase(), path, schema });
     }
 
     const validationMiddleware = createValidationMiddleware(schema, errorHandler);
-    expressRouter[method](path, validationMiddleware, handler as any);
+    const allMiddlewares = middlewares 
+      ? [...middlewares, validationMiddleware]
+      : [validationMiddleware];
+    expressRouter[method](path, ...allMiddlewares, handler as any);
   };
 
   const typedRouter = {
-    get<T extends RouteSchema = RouteSchema>(
-      path: string,
-      options: RouteOptions<T>,
-      handler: TypedRequestHandler<T>
-    ) {
-      registerRoute('get', path, options.schema, handler, options.errorHandler);
+    get(path: string, options: any, ...handlersAndMiddlewares: any[]) {
+      const handler = handlersAndMiddlewares.pop() as any;
+      const middlewares = handlersAndMiddlewares as RequestHandler[];
+      registerRoute('get', path, options.schema, handler, options.errorHandler, middlewares);
       return this;
     },
 
-    post<T extends RouteSchema = RouteSchema>(
-      path: string,
-      options: RouteOptions<T>,
-      handler: TypedRequestHandler<T>
-    ) {
-      registerRoute('post', path, options.schema, handler, options.errorHandler);
+    post(path: string, options: any, ...handlersAndMiddlewares: any[]) {
+      const handler = handlersAndMiddlewares.pop() as any;
+      const middlewares = handlersAndMiddlewares as RequestHandler[];
+      registerRoute('post', path, options.schema, handler, options.errorHandler, middlewares);
       return this;
     },
 
-    put<T extends RouteSchema = RouteSchema>(
-      path: string,
-      options: RouteOptions<T>,
-      handler: TypedRequestHandler<T>
-    ) {
-      registerRoute('put', path, options.schema, handler, options.errorHandler);
+    put(path: string, options: any, ...handlersAndMiddlewares: any[]) {
+      const handler = handlersAndMiddlewares.pop() as any;
+      const middlewares = handlersAndMiddlewares as RequestHandler[];
+      registerRoute('put', path, options.schema, handler, options.errorHandler, middlewares);
       return this;
     },
 
-    delete<T extends RouteSchema = RouteSchema>(
-      path: string,
-      options: RouteOptions<T>,
-      handler: TypedRequestHandler<T>
-    ) {
-      registerRoute('delete', path, options.schema, handler, options.errorHandler);
+    delete(path: string, options: any, ...handlersAndMiddlewares: any[]) {
+      const handler = handlersAndMiddlewares.pop() as any;
+      const middlewares = handlersAndMiddlewares as RequestHandler[];
+      registerRoute('delete', path, options.schema, handler, options.errorHandler, middlewares);
       return this;
     },
 
-    patch<T extends RouteSchema = RouteSchema>(
-      path: string,
-      options: RouteOptions<T>,
-      handler: TypedRequestHandler<T>
-    ) {
-      registerRoute('patch', path, options.schema, handler, options.errorHandler);
+    patch(path: string, options: any, ...handlersAndMiddlewares: any[]) {
+      const handler = handlersAndMiddlewares.pop() as any;
+      const middlewares = handlersAndMiddlewares as RequestHandler[];
+      registerRoute('patch', path, options.schema, handler, options.errorHandler, middlewares);
       return this;
     },
 
@@ -258,8 +299,67 @@ export const CreateTypedRouter = () => {
       if (prop in typedRouter) return (typedRouter as any)[prop]
       return (expressRouter as any)[prop]
     },
-  }) as Router & typeof typedRouter
+  }) as Router & TypedRouterMethods
 };
+
+export interface TypedRouterMethods {
+  get<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    handler: TypedRequestHandler<T>
+  ): TypedRouterMethods;
+  get<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    ...handlersAndMiddlewares: [...RequestHandler[], TypedRequestHandler<T>]
+  ): TypedRouterMethods;
+
+  post<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    handler: TypedRequestHandler<T>
+  ): TypedRouterMethods;
+  post<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    ...handlersAndMiddlewares: [...RequestHandler[], TypedRequestHandler<T>]
+  ): TypedRouterMethods;
+
+  put<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    handler: TypedRequestHandler<T>
+  ): TypedRouterMethods;
+  put<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    ...handlersAndMiddlewares: [...RequestHandler[], TypedRequestHandler<T>]
+  ): TypedRouterMethods;
+
+  delete<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    handler: TypedRequestHandler<T>
+  ): TypedRouterMethods;
+  delete<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    ...handlersAndMiddlewares: [...RequestHandler[], TypedRequestHandler<T>]
+  ): TypedRouterMethods;
+
+  patch<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    handler: TypedRequestHandler<T>
+  ): TypedRouterMethods;
+  patch<T extends RouteSchema = RouteSchema>(
+    path: string,
+    options: RouteOptions<T>,
+    ...handlersAndMiddlewares: [...RequestHandler[], TypedRequestHandler<T>]
+  ): TypedRouterMethods;
+
+  getRouter(): Router;
+}
 
 export const getRoutesMetadata = () => routesMetadata;
 

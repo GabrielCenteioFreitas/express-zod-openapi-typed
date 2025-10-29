@@ -7,6 +7,7 @@ Type-safe Express routes with Zod validation and automatic OpenAPI specification
 - **Type-safe routes** - Full TypeScript support with inferred types from Zod schemas
 - **Request validation** - Automatic validation of body, query, params, and headers
 - **Response validation** - Ensure your API responses match your schemas
+- **File upload support** - Built-in validation and OpenAPI documentation for multipart/form-data
 - **OpenAPI generation** - Automatically generate OpenAPI 3.1 specs from your routes
 - **Customizable error handling** - Override default validation error responses
 - **Global configuration** - Set defaults for OpenAPI generation
@@ -195,6 +196,7 @@ setOpenAPIDefaults({
 | `querystring` | `ZodType` | Validates query parameters |
 | `params` | `ZodType` | Validates route parameters |
 | `headers` | `ZodType` | Validates request headers |
+| `files` | `Record<string, FileFieldConfig>` | Validates file uploads (multipart/form-data) |
 | `response` | `Record<number, ZodType>` | Validates response by status code |
 | `summary` | `string` | Short route description for OpenAPI |
 | `description` | `string` | Detailed route description for OpenAPI |
@@ -211,6 +213,7 @@ import type {
   RouteSchema, 
   TypedRequest, 
   TypedResponse,
+  FileFieldConfig,
   ErrorHandler,
   OpenAPIConfig,
   OpenAPIGlobalConfig,
@@ -311,6 +314,32 @@ const spec = generateOpenAPISpec({
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(spec));
 ```
 
+### 🔌 Using Middlewares
+
+You can use any Express middleware between the route options and handler:
+
+```typescript
+import rateLimit from 'express-rate-limit';
+import { authenticateToken } from './middleware/auth';
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
+
+router.post('/users', {
+  schema: {
+    body: z.object({ name: z.string() }),
+    response: {
+      201: z.object({ id: z.string() })
+    }
+  }
+}, limiter, authenticateToken, async (req, res) => {
+  // Multiple middlewares are supported
+  res.status(201).json({ id: '123' });
+});
+```
+
 ### 🛡️ Custom Error Handler
 
 **Global Error Handler:**
@@ -375,7 +404,129 @@ router.post('/users', {
     next(err);
   },
 }, handler);
+
 ```
+
+### 📤 File Uploads
+
+**Basic File Upload:**
+
+```typescript
+import multer from 'multer';
+
+const upload = multer({ dest: 'uploads/' });
+
+router.post('/upload', {
+  schema: {
+    summary: 'Upload user avatar',
+    tags: ['Users'],
+    files: {
+      avatar: { 
+        required: true,
+        description: 'User profile picture'
+      }
+    },
+    body: z.object({
+      name: z.string(),
+      email: z.string().email()
+    }),
+    response: {
+      201: z.object({
+        url: z.string(),
+        name: z.string()
+      })
+    }
+  }
+}, upload.single('avatar'), async (req, res) => {
+  const { name, email } = req.body; // Validated by Zod
+  const file = req.file; // Provided by multer, validated by files schema
+  
+  res.status(201).json({
+    url: `/uploads/${file.filename}`,
+    name
+  });
+});
+```
+
+**Multiple Files Upload:**
+
+```typescript
+router.post('/upload-multiple', {
+  schema: {
+    summary: 'Upload multiple images',
+    tags: ['Files'],
+    files: {
+      images: { 
+        required: true,
+        maxCount: 5,
+        description: 'Product images (max 5)'
+      }
+    },
+    response: {
+      201: z.object({
+        urls: z.array(z.string())
+      })
+    }
+  }
+}, upload.array('images', 5), async (req, res) => {
+  const files = req.files as Express.Multer.File[];
+  
+  res.status(201).json({
+    urls: files.map(f => `/uploads/${f.filename}`)
+  });
+});
+```
+
+**Mixed Fields (Files + Form Data):**
+
+```typescript
+router.post('/profile', {
+  schema: {
+    summary: 'Update user profile',
+    tags: ['Users'],
+    files: {
+      avatar: { 
+        required: false,
+        description: 'Profile picture'
+      },
+      cover: { 
+        required: false,
+        description: 'Cover image'
+      }
+    },
+    body: z.object({
+      name: z.string(),
+      bio: z.string().optional(),
+      age: z.string().transform(Number)
+    }),
+    response: {
+      200: z.object({
+        success: z.boolean()
+      })
+    }
+  }
+}, upload.fields([
+  { name: 'avatar', maxCount: 1 },
+  { name: 'cover', maxCount: 1 }
+]), async (req, res) => {
+  const { name, bio, age } = req.body;
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  
+  // Process avatar and cover if provided
+  const avatar = files.avatar?.[0];
+  const cover = files.cover?.[0];
+  
+  res.json({ success: true });
+});
+```
+
+**FileFieldConfig Options:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `required` | `boolean` | Whether the file is required |
+| `maxCount` | `number` | Maximum number of files allowed |
+| `description` | `string` | Description for OpenAPI documentation |\
 
 ## 📄 License
 

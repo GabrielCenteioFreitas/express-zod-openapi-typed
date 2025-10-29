@@ -40,7 +40,45 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
       request.headers = schema.headers;
     }
     
-    if (schema.body) {
+    if (schema.files) {
+      const properties: any = {};
+      const required: string[] = [];
+
+      Object.entries(schema.files).forEach(([fieldName, config]) => {
+        properties[fieldName] = {
+          type: 'string',
+          format: 'binary',
+          description: config.description,
+        };
+        if (config.required) {
+          required.push(fieldName);
+        }
+      });
+
+      if (schema.body) {
+        const bodySchema = schema.body as any;
+        if (bodySchema._def?.typeName === 'ZodObject') {
+          Object.entries(bodySchema.shape).forEach(([key, value]: [string, any]) => {
+            properties[key] = value;
+            if (!value.isOptional()) {
+              required.push(key);
+            }
+          });
+        }
+      }
+
+      request.body = {
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties,
+              ...(required.length > 0 && { required }),
+            },
+          },
+        },
+      };
+    } else if (schema.body) {
       request.body = {
         content: {
           'application/json': {
