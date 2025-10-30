@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
 import { z, ZodSchema, ZodType } from './zod';
-import { getGlobalErrorHandler, defaultErrorHandler } from './config';
+import { getGlobalErrorHandler, defaultErrorHandler, getDefaultResponses } from './config';
 import { RequestValidationError, ResponseValidationError } from './errors';
 
 export type FileFieldConfig = {
@@ -116,13 +116,9 @@ const createValidationMiddleware = <T extends RouteSchema>(
             },
           ]);
           const error = new RequestValidationError('body', zodError, req);
-          if (routeErrorHandler) {
-            return routeErrorHandler(error, req, res, next);
-          }
-          if (globalErrorHandler) {
-            return globalErrorHandler(error, req, res, next);
-          }
-          return next(error);
+          const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
+          return handler(error, req, res, next);
+
         }
       }
 
@@ -130,13 +126,9 @@ const createValidationMiddleware = <T extends RouteSchema>(
         const bodyResult = await schema.body.safeParseAsync(req.body);
         if (!bodyResult.success) {
           const error = new RequestValidationError('body', bodyResult.error, req);
-          if (routeErrorHandler) {
-            return routeErrorHandler(error, req, res, next);
-          }
-          if (globalErrorHandler) {
-            return globalErrorHandler(error, req, res, next);
-          }
-          return next(error);
+          const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
+          return handler(error, req, res, next);
+
         }
         req.body = bodyResult.data;
       }
@@ -162,13 +154,9 @@ const createValidationMiddleware = <T extends RouteSchema>(
         const paramsResult = await schema.params.safeParseAsync(req.params);
         if (!paramsResult.success) {
           const error = new RequestValidationError('params', paramsResult.error, req);
-          if (routeErrorHandler) {
-            return routeErrorHandler(error, req, res, next);
-          }
-          if (globalErrorHandler) {
-            return globalErrorHandler(error, req, res, next);
-          }
-          return next(error);
+          const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
+          return handler(error, req, res, next);
+
         }
 
         Object.defineProperty(req, 'params', {
@@ -183,13 +171,9 @@ const createValidationMiddleware = <T extends RouteSchema>(
         const headersResult = await schema.headers.safeParseAsync(req.headers);
         if (!headersResult.success) {
           const error = new RequestValidationError('headers', headersResult.error, req);
-          if (routeErrorHandler) {
-            return routeErrorHandler(error, req, res, next);
-          }
-          if (globalErrorHandler) {
-            return globalErrorHandler(error, req, res, next);
-          }
-          return next(error);
+          const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
+          return handler(error, req, res, next);
+
         }
         Object.assign(req.headers, headersResult.data);
       }
@@ -197,6 +181,7 @@ const createValidationMiddleware = <T extends RouteSchema>(
       if (schema.response) {
         const originalJson = res.json.bind(res);
         const originalStatus = res.status.bind(res);
+        const defaultResponses = getDefaultResponses();
 
         let currentStatusCode = 200;
 
@@ -206,7 +191,12 @@ const createValidationMiddleware = <T extends RouteSchema>(
         };
 
         res.json = function(body: any) {
-          const responseSchema = schema.response![currentStatusCode];
+          let responseSchema = schema.response![currentStatusCode];
+          
+          if (!responseSchema && defaultResponses) {
+            responseSchema = defaultResponses[currentStatusCode];
+          }
+
           if (responseSchema) {
             const result = responseSchema.safeParse(body);
             if (!result.success) {

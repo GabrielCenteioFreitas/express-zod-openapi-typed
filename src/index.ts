@@ -7,6 +7,7 @@ export type { OpenAPIConfig } from './swagger';
 export { 
   setGlobalErrorHandler, 
   setOpenAPIDefaults,
+  setDefaultResponses,
   defaultErrorHandler 
 } from './config';
 export type { 

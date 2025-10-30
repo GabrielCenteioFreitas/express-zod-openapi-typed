@@ -188,6 +188,29 @@ setOpenAPIDefaults({
 });
 ```
 
+### `setDefaultResponses(responses)`
+
+Set default response schemas that apply to all routes. Routes can still override these by defining their own responses.
+
+```typescript
+import { setDefaultResponses } from 'express-zod-openapi-typed';
+import { z } from 'zod';
+
+setDefaultResponses({
+  400: z.object({ 
+    message: z.string(), 
+    errors: z.any() 
+  }),
+  422: z.object({ 
+    message: z.string(), 
+    status: z.string() 
+  }),
+  500: z.object({ 
+    error: z.string() 
+  }),
+});
+```
+
 ## 📋 Route Schema Options
 
 | Property | Type | Description |

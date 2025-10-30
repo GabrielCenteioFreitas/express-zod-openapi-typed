@@ -1,6 +1,6 @@
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import { getRoutesMetadata } from './typed-router';
-import { getOpenAPIDefaults } from './config';
+import { getOpenAPIDefaults, getDefaultResponses } from './config';
 import { extractParameters } from './lib/extract-parameters';
 import { zodSchemaToOpenAPISchema } from './lib/zod-to-openapi-schema';
 
@@ -90,6 +90,20 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
     }
 
     const responses: any = {};
+    const defaultResponses = getDefaultResponses();
+
+    if (defaultResponses) {
+      Object.entries(defaultResponses).forEach(([statusCode, zodSchema]) => {
+        responses[statusCode] = {
+          description: `Response ${statusCode}`,
+          content: {
+            'application/json': {
+              schema: zodSchema,
+            },
+          },
+        };
+      });
+    }
     
     if (schema.response) {
       Object.entries(schema.response).forEach(([statusCode, zodSchema]) => {
@@ -102,7 +116,7 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
           },
         };
       });
-    } else {
+    } else if (!defaultResponses) {
       responses['200'] = {
         description: 'Successful response',
       };
