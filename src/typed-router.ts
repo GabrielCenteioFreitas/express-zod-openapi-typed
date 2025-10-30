@@ -145,13 +145,9 @@ const createValidationMiddleware = <T extends RouteSchema>(
         const queryResult = await schema.querystring.safeParseAsync(req.query);
         if (!queryResult.success) {
           const error = new RequestValidationError('querystring', queryResult.error, req);
-          if (routeErrorHandler) {
-            return routeErrorHandler(error, req, res, next);
-          }
-          if (globalErrorHandler) {
-            return globalErrorHandler(error, req, res, next);
-          }
-          return next(error);
+          const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
+          return handler(error, req, res, next);
+
         }
         
         Object.defineProperty(req, 'query', {
@@ -220,11 +216,8 @@ const createValidationMiddleware = <T extends RouteSchema>(
                 routeErrorHandler(error, req, res, next);
                 return res;
               }
-              if (globalErrorHandler) {
-                globalErrorHandler(error, req, res, next);
-                return res;
-              }
-              next(error);
+              const handler = globalErrorHandler || defaultErrorHandler;
+              handler(error, req, res, next);
               return res;
             }
           }
