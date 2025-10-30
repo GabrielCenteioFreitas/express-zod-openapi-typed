@@ -1,6 +1,10 @@
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
 import { getRoutesMetadata } from './typed-router';
 import { getOpenAPIDefaults } from './config';
+import { extractParameters } from './lib/extract-parameters';
+import { zodSchemaToOpenAPISchema } from './lib/zod-to-openapi-schema';
+
+export { zodSchemaToOpenAPISchema } from './lib/zod-to-openapi-schema';
 
 export interface OpenAPIConfig {
   info: {
@@ -26,19 +30,13 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
   routes.forEach(({ method, path, schema }) => {
     const fullPath = `${basePath}${path}`.replace(/\/:([^/]+)/g, '/{$1}');
 
+    const parameters: any[] = [
+      ...extractParameters(schema.params, 'path'),
+      ...extractParameters(schema.querystring, 'query'),
+      ...extractParameters(schema.headers, 'header'),
+    ];
+    
     const request: any = {};
-    
-    if (schema.params) {
-      request.params = schema.params;
-    }
-    
-    if (schema.querystring) {
-      request.query = schema.querystring;
-    }
-    
-    if (schema.headers) {
-      request.headers = schema.headers;
-    }
     
     if (schema.files) {
       const properties: any = {};
@@ -57,10 +55,13 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
 
       if (schema.body) {
         const bodySchema = schema.body as any;
-        if (bodySchema._def?.typeName === 'ZodObject') {
-          Object.entries(bodySchema.shape).forEach(([key, value]: [string, any]) => {
-            properties[key] = value;
-            if (!value.isOptional()) {
+        const def = bodySchema._def || bodySchema.def;
+        if (def?.typeName === 'ZodObject' || def?.type === 'object') {
+          const shape = typeof def.shape === 'function' ? def.shape() : def.shape;
+          Object.entries(shape).forEach(([key, value]: [string, any]) => {
+            properties[key] = zodSchemaToOpenAPISchema(value);
+            const isOptional = value.isOptional && value.isOptional();
+            if (!isOptional) {
               required.push(key);
             }
           });
@@ -116,6 +117,7 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
       operationId: schema.operationId,
       deprecated: schema.deprecated,
       security: schema.security,
+      ...(parameters.length > 0 && { parameters }),
       ...(Object.keys(request).length > 0 && { request }),
       responses,
     });

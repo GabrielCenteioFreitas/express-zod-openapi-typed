@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction, RequestHandler, ErrorRequestHandler } from 'express';
-import { z, ZodSchema, ZodType } from 'zod';
+import { z, ZodSchema, ZodType } from './zod';
 import { getGlobalErrorHandler, defaultErrorHandler } from './config';
 import { RequestValidationError, ResponseValidationError } from './errors';
 
@@ -153,7 +153,13 @@ const createValidationMiddleware = <T extends RouteSchema>(
           }
           return next(error);
         }
-        req.query = queryResult.data;
+        
+        Object.defineProperty(req, 'query', {
+          value: queryResult.data,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
 
       if (schema.params) {
@@ -168,7 +174,13 @@ const createValidationMiddleware = <T extends RouteSchema>(
           }
           return next(error);
         }
-        req.params = paramsResult.data;
+
+        Object.defineProperty(req, 'params', {
+          value: paramsResult.data,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
 
       if (schema.headers) {
