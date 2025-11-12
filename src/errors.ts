@@ -1,7 +1,7 @@
 import { ZodError } from 'zod';
 import { Request, Response } from 'express';
 
-export type ValidationSegment = 'body' | 'querystring' | 'params' | 'headers';
+export type ValidationSegment = 'body' | 'query' | 'querystring' | 'params' | 'headers';
 
 export class RequestValidationError extends Error {
   public readonly segment: ValidationSegment;

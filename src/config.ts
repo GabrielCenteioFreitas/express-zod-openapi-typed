@@ -71,7 +71,8 @@ export const defaultErrorHandler: ErrorHandler = (error, req, res, next) => {
   if (error instanceof RequestValidationError) {
     const errorMessages: Record<typeof error.segment, string> = {
       body: 'Body validation failed.',
-      querystring: 'Query string validation failed.',
+      query: 'Query validation failed.',
+      querystring: 'Query validation failed.',
       params: 'Params validation failed.',
       headers: 'Headers validation failed.',
     };

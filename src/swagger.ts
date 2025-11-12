@@ -135,9 +135,10 @@ export const generateOpenAPISpec = (config: OpenAPIConfig, basePath: string = ''
   routes.forEach(({ method, path, schema }) => {
     const fullPath = `${basePath}${path}`.replace(/\/:([^/]+)/g, '/{$1}');
 
+    const querySchema = schema.query || schema.querystring;
     const parameters: any[] = [
       ...extractParameters(schema.params, 'path'),
-      ...extractParameters(schema.querystring, 'query'),
+      ...extractParameters(querySchema, 'query'),
       ...extractParameters(schema.headers, 'header'),
     ];
     

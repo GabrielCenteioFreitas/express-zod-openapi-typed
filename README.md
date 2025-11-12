@@ -117,7 +117,7 @@ router.post('/users/:id', {
 ```typescript
 {
   params: z.object({ id: z.string() }),
-  querystring: z.object({ limit: z.string().optional() }),
+  query: z.object({ limit: z.string().optional() }),
   body: z.object({ name: z.string() }),
   headers: z.object({ authorization: z.string() }),
   response: {
@@ -351,7 +351,7 @@ setDefaultResponses({
 | Property | Type | Description |
 |----------|------|-------------|
 | `body` | `ZodType` | Validates request body |
-| `querystring` | `ZodType` | Validates query parameters |
+| `query` | `ZodType` | Validates query parameters |
 | `params` | `ZodType` | Validates route parameters |
 | `headers` | `ZodType` | Validates request headers |
 | `files` | `Record<string, FileFieldConfig>` | Validates file uploads (multipart/form-data) |

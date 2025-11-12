@@ -11,6 +11,8 @@ export type FileFieldConfig = {
 
 export interface RouteSchema {
   body?: ZodType<any>;
+  query?: ZodType<any>;
+  /** @deprecated Use 'query' instead */
   querystring?: ZodType<any>;
   params?: ZodType<any>;
   headers?: ZodType<any>;
@@ -36,7 +38,7 @@ export interface RouteOptions<T extends RouteSchema> {
 
 type InferSchemaTypes<T extends RouteSchema> = {
   Body: T['body'] extends ZodType ? z.infer<T['body']> : unknown;
-  Querystring: T['querystring'] extends ZodType ? z.infer<T['querystring']> : unknown;
+  Query: T['query'] extends ZodType ? z.infer<T['query']> : (T['querystring'] extends ZodType ? z.infer<T['querystring']> : unknown);
   Params: T['params'] extends ZodType ? z.infer<T['params']> : unknown;
   Headers: T['headers'] extends ZodType ? z.infer<T['headers']> : unknown;
 };
@@ -60,7 +62,7 @@ export type TypedRequest<T extends RouteSchema> = Request<
   InferSchemaTypes<T>['Params'],
   any,
   InferSchemaTypes<T>['Body'],
-  InferSchemaTypes<T>['Querystring']
+  InferSchemaTypes<T>['Query']
 > & {
   headers: InferSchemaTypes<T>['Headers'] & Request['headers'];
 };
@@ -133,10 +135,15 @@ const createValidationMiddleware = <T extends RouteSchema>(
         req.body = bodyResult.data;
       }
 
-      if (schema.querystring) {
-        const queryResult = await schema.querystring.safeParseAsync(req.query);
+      const querySchema = schema.query || schema.querystring;
+      if (querySchema) {
+        if (schema.querystring && !schema.query) {
+          console.warn('[express-zod-openapi] DEPRECATION WARNING: "querystring" is deprecated. Use "query" instead to match Express conventions.');
+        }
+
+        const queryResult = await querySchema.safeParseAsync(req.query);
         if (!queryResult.success) {
-          const error = new RequestValidationError('querystring', queryResult.error, req);
+          const error = new RequestValidationError('query', queryResult.error, req);
           const handler = routeErrorHandler ?? globalErrorHandler ?? defaultErrorHandler;
           return handler(error, req, res, next);
 
