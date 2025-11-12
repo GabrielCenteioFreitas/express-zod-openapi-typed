@@ -2,7 +2,23 @@ export { CreateTypedRouter, createSchema, getRoutesMetadata } from './typed-rout
 export type { RouteSchema, TypedRequest, TypedResponse, FileFieldConfig } from './typed-router';
 
 export { generateOpenAPISpec } from './swagger';
-export type { OpenAPIConfig } from './swagger';
+export type { 
+  OpenAPIConfig,
+  ContactObject,
+  LicenseObject,
+  ServerObject,
+  ServerVariable,
+  ExternalDocumentationObject,
+  TagObject,
+  SecurityScheme,
+  SecuritySchemeApiKey,
+  SecuritySchemeHttp,
+  SecuritySchemeOAuth2,
+  SecuritySchemeOpenIdConnect,
+  OAuthFlowObject,
+  ComponentsObject,
+  WebhookObject
+} from './swagger';
 
 export { 
   setGlobalErrorHandler, 

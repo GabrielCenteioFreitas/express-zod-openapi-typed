@@ -138,6 +138,8 @@ router.post('/users/:id', {
 
 Generates an OpenAPI 3.1 specification from registered routes.
 
+#### Basic Configuration
+
 ```typescript
 const spec = generateOpenAPISpec({
   info: {
@@ -152,6 +154,139 @@ const spec = generateOpenAPISpec({
   tags: [
     { name: 'Users', description: 'User management' },
   ],
+}, '/api/v1');
+```
+
+#### Full Configuration with All Options
+
+```typescript
+const spec = generateOpenAPISpec({
+  info: {
+    title: 'My API',
+    summary: 'A comprehensive REST API',
+    description: 'Full API documentation with examples',
+    version: '1.0.0',
+    termsOfService: 'https://example.com/terms',
+    contact: {
+      name: 'API Support',
+      url: 'https://example.com/support',
+      email: 'support@example.com'
+    },
+    license: {
+      name: 'MIT',
+      url: 'https://opensource.org/licenses/MIT'
+    }
+  },
+  servers: [
+    {
+      url: 'https://{environment}.example.com/api/{version}',
+      description: 'Main API server',
+      variables: {
+        environment: {
+          default: 'dev',
+          enum: ['dev', 'staging', 'prod'],
+          description: 'Environment name'
+        },
+        version: {
+          default: 'v1',
+          description: 'API version'
+        }
+      }
+    }
+  ],
+  tags: [
+    {
+      name: 'Users',
+      description: 'User management endpoints',
+      externalDocs: {
+        description: 'Find more info here',
+        url: 'https://docs.example.com/users'
+      }
+    }
+  ],
+  externalDocs: {
+    description: 'Complete documentation',
+    url: 'https://docs.example.com'
+  },
+  security: [
+    { bearerAuth: [] }
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'JWT authentication token'
+      },
+      apiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+        description: 'API key for authentication'
+      },
+      oauth2: {
+        type: 'oauth2',
+        description: 'OAuth2 authentication',
+        flows: {
+          authorizationCode: {
+            authorizationUrl: 'https://example.com/oauth/authorize',
+            tokenUrl: 'https://example.com/oauth/token',
+            scopes: {
+              'read:users': 'Read user data',
+              'write:users': 'Modify user data'
+            }
+          }
+        }
+      }
+    },
+    schemas: {
+      Error: {
+        type: 'object',
+        properties: {
+          code: { type: 'string' },
+          message: { type: 'string' }
+        }
+      }
+    },
+    responses: {
+      UnauthorizedError: {
+        description: 'Authentication information is missing or invalid',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' }
+          }
+        }
+      }
+    }
+  },
+  webhooks: {
+    'user.created': {
+      post: {
+        summary: 'User created webhook',
+        description: 'Triggered when a new user is created',
+        tags: ['Webhooks'],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  userId: { type: 'string' },
+                  email: { type: 'string' }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: 'Webhook received successfully'
+          }
+        }
+      }
+    }
+  }
 }, '/api/v1');
 ```
 

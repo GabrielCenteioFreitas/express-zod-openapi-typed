@@ -19,10 +19,19 @@ export interface OpenAPIGlobalConfig {
   servers?: Array<{
     url: string;
     description?: string;
+    variables?: Record<string, {
+      enum?: string[];
+      default: string;
+      description?: string;
+    }>;
   }>;
   tags?: Array<{
     name: string;
     description?: string;
+    externalDocs?: {
+      description?: string;
+      url: string;
+    };
   }>;
 }
 
